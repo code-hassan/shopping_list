@@ -17,6 +17,8 @@ class GroceryList extends StatefulWidget {
 class _GroceryListState extends State<GroceryList> {
   List<GroceryItem> _groceryItems = [];
   var _isLoading = true;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
@@ -25,6 +27,20 @@ class _GroceryListState extends State<GroceryList> {
    void _loadItem() async{
      final url = Uri.https("flutterfire-demo-22241-default-rtdb.firebaseio.com","shopping-list.json");
      final response = await http.get(url);
+
+     if(response.statusCode >= 400){
+       setState(() {
+         _error = "Failed to fetch data. Please try again later";
+       });
+     }
+     if(response.body == 'null'){
+       setState(() {
+         _isLoading = false;
+       });
+       return;
+     }
+     print("vvvvvvvvvvvvv ${response.body}");
+
      final List<GroceryItem> loadedItems= [];
      final Map<String,dynamic> listData = json.decode(response.body);
      for(final item in listData.entries){
@@ -60,14 +76,36 @@ class _GroceryListState extends State<GroceryList> {
        _groceryItems.add(newItem);
      });
   }
-  void _removeItem(GroceryItem item){
+  void _removeItem(GroceryItem item) async{
+    final index = _groceryItems.indexOf(item);
     setState(() {
       _groceryItems.remove(item);
     });
+    final url = Uri.https("flutterfire-demo-22241-default-rtdb.firebaseio.com",
+        "shopping-list/${item.id}.json");
+    final response = await http.delete(url);
+    if(response.statusCode >= 400){
+      // Optional: Show error message
+      setState(() {
+        _groceryItems.insert(index, item);
+      });
+    }
+
   }
   @override
   Widget build(BuildContext context) {
-    Widget content = const Center(child: Text("No items added yet."),);
+    Widget content =  Center(child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Text("No items added yet."),
+        const SizedBox(height: 5,),
+        ElevatedButton(
+            onPressed: _addItem,
+            child: const Text("Add Item"),
+        ),
+      ],
+    ),);
     if(_isLoading){
       content = const Center(child: CircularProgressIndicator(),);
     }
@@ -92,6 +130,11 @@ class _GroceryListState extends State<GroceryList> {
             ),
           ));
     }
+    if(_error != null){
+      content = Center(child: Text(_error!),);
+    }
+
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Your Groceries"),
